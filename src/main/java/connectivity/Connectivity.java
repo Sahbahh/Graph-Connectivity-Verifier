@@ -92,7 +92,7 @@ public class Connectivity {
             adjacencyList.get(edge[1]).add(edge[0]); // Undirected graph
         }
 
-        // Perform a BFS/DFS to check connectivity
+        // Perform a DFS to check connectivity
         Set<Integer> visited = new HashSet<>();
         dfs(1, adjacencyList, visited);
 
