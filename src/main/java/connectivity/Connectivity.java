@@ -35,7 +35,7 @@ public class Connectivity {
             }
 
             // Check connectivity
-            boolean isConnected = checkConnectivityWithDFSAndZ3(graphInput);
+            boolean isConnected = checkConnectivityUndirected(graphInput);
 
             System.out.println("The graph is " + (isConnected ? "connected." : "NOT connected."));
         } catch (IOException e) {
@@ -89,7 +89,7 @@ public class Connectivity {
      * @param graphInput The input graph, containing the number of nodes and a list of edges.
      * @return True if the graph is connected; False otherwise.
      */
-    private static boolean checkConnectivityWithDFSAndZ3(GraphInput graphInput) {
+    private static boolean checkConnectivityUndirected(GraphInput graphInput) {
         // Create a Z3 context for managing logical constraints.
         Context ctx = new Context();
         try {
@@ -178,6 +178,40 @@ public class Connectivity {
             ctx.close();
         }
     }
+
+
+    /**
+     * TODO: Liza
+     * Checks the strong connectivity of a directed graph
+     *
+     * @param graphInput The input graph, containing the number of nodes and a list of directed edges.
+     * @return True if the graph is strongly connected; False otherwise.
+     */
+    private static boolean checkConnectivityDirected(GraphInput graphInput) {
+
+        // Step 1: Initialize Z3 context to manage logical constraints
+        // Step 2: Build an adjacency list
+
+        // Step 3: Perform two DFS traversals for an early connectivity check:
+        // a) Forward DFS from an arbitrary node (e.g., node 1) to determine reachable nodes
+        // b) Reverse DFS on the graph with all edges reversed to check reachability back to the starting node
+        // If either traversal fails to visit all nodes, return false 
+
+        // Step 4: Z3 solver 
+        // Step 5: Z3 variables to represent reachability between nodes (2D Boolean array edgeVars[i][j] indicating if there is a path)
+        // Step 6: Add constraints for direct edges
+        // Step 7: Add constraints for transitive closure
+
+        // Step 8: Add constraints for strong connectivity:
+        // - For strong connectivity, all node pairs (i, j) must satisfy:
+        //   - i can reach j (i -> j).
+        //   - j can reach i (j -> i).
+
+        // Step 9: Z3 solver to check if all the constraints are satisfiable
+        // Step 10: close the Z3 context to release resources
+        return false;
+    }
+
 
 
     /**
