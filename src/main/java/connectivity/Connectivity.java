@@ -20,11 +20,11 @@ public class Connectivity {
             // Parse the input file
             GraphInput graphInput = parseInputFile(inputFilePath);
 
-            if (graphInput.isDirected) {
+        /*    if (graphInput.isDirected) {
                 // TODO: remove once directed it implmented
                 System.err.println("Only undirected graphs at this step. Liza XD");
                 System.exit(1);
-            }
+            }*/
 
             // Print parsed data (for debugging purposes)
             System.out.println("Graph Type: " + (graphInput.isDirected ? "Directed" : "Undirected"));
@@ -35,10 +35,17 @@ public class Connectivity {
             }
 
             // Check connectivity
-            boolean isConnected = checkConnectivityUndirected(graphInput);
-
-            System.out.println("The graph is " + (isConnected ? "connected." : "NOT connected."));
-        } catch (IOException e) {
+            boolean isConnected;
+            if (graphInput.isDirected) {
+                // Check strong connectivity for directed graphs
+                isConnected = checkConnectivityDirected(graphInput);
+                System.out.println("The directed graph is " + (isConnected ? "strongly connected." : "NOT strongly connected."));
+            } else {
+                // Check connectivity for undirected graphs
+                isConnected = checkConnectivityUndirected(graphInput);
+                System.out.println("The undirected graph is " + (isConnected ? "connected." : "NOT connected."));
+            }
+        }catch (IOException e) {
             System.err.println("Error reading input file: " + e.getMessage());
             System.exit(1);
         }
@@ -188,31 +195,109 @@ public class Connectivity {
      * @return True if the graph is strongly connected; False otherwise.
      */
     private static boolean checkConnectivityDirected(GraphInput graphInput) {
+        // Step 1: Create a Z3 context to manage logical constraints.
+        Context ctx = new Context();
 
-        // Step 1: Initialize Z3 context to manage logical constraints
-        // Step 2: Build an adjacency list
+        try {
+            int numNodes = graphInput.numNodes; // Total number of nodes in the graph
+            List<int[]> edges = graphInput.edges; // List of directed edges in the graph
 
-        // Step 3: Perform two DFS traversals for an early connectivity check:
-        // a) Forward DFS from an arbitrary node (e.g., node 1) to determine reachable nodes
-        // b) Reverse DFS on the graph with all edges reversed to check reachability back to the starting node
-        // If either traversal fails to visit all nodes, return false 
+            // Step 2: Build adjacency lists for forward and reverse DFS traversals.
+            Map<Integer, List<Integer>> adjacencyList = new HashMap<>();
+            Map<Integer, List<Integer>> reverseAdjacencyList = new HashMap<>();
 
-        // Step 4: Z3 solver 
-        // Step 5: Z3 variables to represent reachability between nodes (2D Boolean array edgeVars[i][j] indicating if there is a path)
-        // Step 6: Add constraints for direct edges
-        // Step 7: Add constraints for transitive closure
+            // Initialize adjacency lists for all nodes.
+            for (int i = 1; i <= numNodes; i++) {
+                adjacencyList.put(i, new ArrayList<>());
+                reverseAdjacencyList.put(i, new ArrayList<>());
+            }
 
-        // Step 8: Add constraints for strong connectivity:
-        // - For strong connectivity, all node pairs (i, j) must satisfy:
-        //   - i can reach j (i -> j).
-        //   - j can reach i (j -> i).
+            // Populate adjacency lists with the edges from the input graph.
+            for (int[] edge : edges) {
+                adjacencyList.get(edge[0]).add(edge[1]); // Forward edge
+                reverseAdjacencyList.get(edge[1]).add(edge[0]); // Reverse edge
+            }
 
-        // Step 9: Z3 solver to check if all the constraints are satisfiable
-        // Step 10: close the Z3 context to release resources
-        return false;
+            // Step 3: Perform a forward DFS from node 1 to check reachability.
+            Set<Integer> reachable = new HashSet<>();
+            dfs(1, adjacencyList, reachable);
+
+            // If not all nodes are reachable, the graph is not strongly connected.
+            if (reachable.size() != numNodes) {
+                return false;
+            }
+
+            // Step 4: Perform a reverse DFS from node 1 to check reverse reachability.
+            Set<Integer> reverseReachable = new HashSet<>();
+            dfs(1, reverseAdjacencyList, reverseReachable);
+
+            // If not all nodes are reachable in the reverse graph, the graph is not strongly connected.
+            if (reverseReachable.size() != numNodes) {
+                return false;
+            }
+
+            // Step 5: Use Z3 to verify strong connectivity constraints.
+            Solver solver = ctx.mkSolver();
+
+            // Step 6: Create Z3 variables to represent reachability between nodes.
+            // reachVars[i][j] represents whether there is a path from node i to node j.
+            BoolExpr[][] reachVars = new BoolExpr[numNodes + 1][numNodes + 1];
+            for (int i = 1; i <= numNodes; i++) {
+                for (int j = 1; j <= numNodes; j++) {
+                    if (i != j) {
+                        reachVars[i][j] = ctx.mkBoolConst("reach_" + i + "_" + j);
+                    }
+                }
+            }
+
+            // Step 7: Add Z3 constraints for direct edges.
+            for (int[] edge : edges) {
+                int u = edge[0]; // Start node of the edge.
+                int v = edge[1]; // End node of the edge.
+
+                // If there's a direct edge from u to v, they are directly reachable.
+                solver.add(reachVars[u][v]);
+            }
+
+            // Step 8: Add Z3 constraints for transitive closure.
+            for (int i = 1; i <= numNodes; i++) {
+                for (int j = 1; j <= numNodes; j++) {
+                    if (i != j) {
+                        // Start with no paths between nodes i and j.
+                        BoolExpr reachableThroughOthers = ctx.mkFalse();
+
+                        for (int k = 1; k <= numNodes; k++) {
+                            if (k != i && k != j) {
+                                // If there's a path from i to k and k to j, then i can reach j through k.
+                                reachableThroughOthers = ctx.mkOr(reachableThroughOthers,
+                                        ctx.mkAnd(reachVars[i][k], reachVars[k][j]));
+                            }
+                        }
+
+                        // Enforce that i can reach j either directly or indirectly.
+                        solver.add(ctx.mkImplies(reachVars[i][j], reachableThroughOthers));
+                    }
+                }
+            }
+
+            // Step 9: Add constraints for strong connectivity.
+            BoolExpr stronglyConnected = ctx.mkTrue();
+            for (int i = 1; i <= numNodes; i++) {
+                for (int j = i + 1; j <= numNodes; j++) {
+                    // Both i must reach j and j must reach i.
+                    stronglyConnected = ctx.mkAnd(stronglyConnected, reachVars[i][j], reachVars[j][i]);
+                }
+            }
+            solver.add(stronglyConnected);
+
+            // Step 10: Use the solver to check if all constraints are satisfiable.
+            return solver.check() == Status.SATISFIABLE;
+
+        } finally {
+            // Step 11: Close the Z3 context to release resources.
+            ctx.close();
+        }
     }
-
-
 
     /**
      * Performs a Depth-First Search (DFS) traversal to find all reachable nodes
