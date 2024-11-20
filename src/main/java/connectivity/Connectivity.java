@@ -196,7 +196,7 @@ public class Connectivity {
      */
     private static boolean checkConnectivityDirected(GraphInput graphInput) {
         // Step 1: Create a Z3 context to manage logical constraints.
-        Context ctx = new Context(); //IMMA TRY PUSING THIS
+        Context ctx = new Context(); 
 
         try {
             int numNodes = graphInput.numNodes; // Total number of nodes in the graph
