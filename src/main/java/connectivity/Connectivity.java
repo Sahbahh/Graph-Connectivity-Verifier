@@ -42,13 +42,13 @@ public class Connectivity {
                 System.out.println("The directed graph is " + (isConnected ? "strongly connected." : "NOT strongly connected."));
                 
                 // Print SCCs ONLY if the graph is strongly connected
-                if (isConnected) {
+              //  if (isConnected) {
                     List<List<Integer>> sccs = tarjansSCC(graphInput);
                     System.out.println("Strongly connected components:");
                     for (List<Integer> scc : sccs) {
                         System.out.println(scc);
                     }
-                }
+                //}
             } else {
                 // Check connectivity for undirected graphs
                 isConnected = checkConnectivityUndirected(graphInput);
@@ -216,7 +216,7 @@ public class Connectivity {
             Map<Integer, List<Integer>> reverseAdjacencyList = new HashMap<>();
 
             // Initialize the adjacency lists for all nodes from 0 to numNodes - 1.
-            for (int i = 0; i < numNodes; i++) {
+            for (int i = 0; i <= numNodes; i++) {
                 adjacencyList.put(i, new ArrayList<>());
                 reverseAdjacencyList.put(i, new ArrayList<>());
             }
@@ -229,7 +229,7 @@ public class Connectivity {
 
             // Step 3: Perform a forward DFS from node 0 to check reachability.
             Set<Integer> reachable = new HashSet<>();
-            dfs(0, adjacencyList, reachable); // Start DFS from node 0
+            dfs(1, adjacencyList, reachable); // Start DFS from node 0
 
             // If not all nodes are reachable, the graph is not strongly connected.
             if (reachable.size() != numNodes) {
@@ -238,7 +238,7 @@ public class Connectivity {
 
             // Step 4: Perform a reverse DFS from node 0 to check reverse reachability.
             Set<Integer> reverseReachable = new HashSet<>();
-            dfs(0, reverseAdjacencyList, reverseReachable);
+            dfs(1, reverseAdjacencyList, reverseReachable);
 
             // If not all nodes are reachable in the reverse graph, the graph is not strongly connected.
             if (reverseReachable.size() != numNodes) {
@@ -260,7 +260,7 @@ public class Connectivity {
 
         // Create an adjacency list representation of the graph.
         List<List<Integer>> graph = new ArrayList<>();
-        for (int i = 0; i < numNodes; i++) {
+        for (int i = 0; i <= numNodes; i++) { // Include 0 to numNodes for 1-based indexing
             graph.add(new ArrayList<>());
         }
 
@@ -273,11 +273,9 @@ public class Connectivity {
         List<List<Integer>> sccComponents = new ArrayList<>();
 
         // Arrays to keep track of discovery IDs and low-link values for each node.
-        int[] ids = new int[numNodes]; // Discovery IDs for each node.
-        int[] low = new int[numNodes]; // Lowest discovery ID reachable from each node.
-
-        // Boolean array to track whether a node is currently in the recursion stack.
-        boolean[] onStack = new boolean[numNodes];
+        int[] ids = new int[numNodes + 1]; // Discovery IDs for each node (1-based).
+        int[] low = new int[numNodes + 1]; // Lowest discovery ID reachable from each node (1-based).
+        boolean[] onStack = new boolean[numNodes + 1]; // Track whether nodes are in the stack.
 
         // Stack to store the nodes currently being processed in the DFS.
         Stack<Integer> stack = new Stack<>();
@@ -289,7 +287,7 @@ public class Connectivity {
         Arrays.fill(ids, -1);
 
         // Perform a depth-first search (DFS) on all unvisited nodes.
-        for (int i = 0; i < numNodes; i++) {
+        for (int i = 1; i <= numNodes; i++) { // Start from 1 and include all nodes
             if (ids[i] == -1) { // If the node has not been visited.
                 dfsTarjan(i, ids, low, onStack, stack, graph, sccComponents, id);
             }
@@ -298,6 +296,7 @@ public class Connectivity {
         // Return the list of strongly connected components.
         return sccComponents;
     }
+
 
 
     private static void dfsTarjan(int at, int[] ids, int[] low, boolean[] onStack, Stack<Integer> stack,
