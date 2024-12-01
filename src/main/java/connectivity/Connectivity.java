@@ -40,6 +40,15 @@ public class Connectivity {
                 // Check strong connectivity for directed graphs
                 isConnected = checkConnectivityDirected(graphInput);
                 System.out.println("The directed graph is " + (isConnected ? "strongly connected." : "NOT strongly connected."));
+                
+                // Print SCCs ONLY if the graph is strongly connected
+                if (isConnected) {
+                    List<List<Integer>> sccs = tarjansSCC(graphInput);
+                    System.out.println("Strongly connected components:");
+                    for (List<Integer> scc : sccs) {
+                        System.out.println(scc);
+                    }
+                }
             } else {
                 // Check connectivity for undirected graphs
                 isConnected = checkConnectivityUndirected(graphInput);
@@ -105,7 +114,7 @@ public class Connectivity {
     
             // Step 1: Build adjacency list for DFS traversal.
             Map<Integer, List<Integer>> adjacencyList = new HashMap<>();
-            for (int i = 1; i <= numNodes; i++) {
+            for (int i = 0; i <= numNodes; i++) {
                 // Initialize adjacency list for each node
                 adjacencyList.put(i, new ArrayList<>());
             }
@@ -196,7 +205,7 @@ public class Connectivity {
      */
     private static boolean checkConnectivityDirected(GraphInput graphInput) {
         // Step 1: Create a Z3 context to manage logical constraints.
-        Context ctx = new Context(); 
+        Context ctx = new Context();
 
         try {
             int numNodes = graphInput.numNodes; // Total number of nodes in the graph
@@ -206,8 +215,8 @@ public class Connectivity {
             Map<Integer, List<Integer>> adjacencyList = new HashMap<>();
             Map<Integer, List<Integer>> reverseAdjacencyList = new HashMap<>();
 
-            // Initialize adjacency lists for all nodes.
-            for (int i = 1; i <= numNodes; i++) {
+            // Initialize the adjacency lists for all nodes from 0 to numNodes - 1.
+            for (int i = 0; i < numNodes; i++) {
                 adjacencyList.put(i, new ArrayList<>());
                 reverseAdjacencyList.put(i, new ArrayList<>());
             }
@@ -218,84 +227,117 @@ public class Connectivity {
                 reverseAdjacencyList.get(edge[1]).add(edge[0]); // Reverse edge
             }
 
-            // Step 3: Perform a forward DFS from node 1 to check reachability.
+            // Step 3: Perform a forward DFS from node 0 to check reachability.
             Set<Integer> reachable = new HashSet<>();
-            dfs(1, adjacencyList, reachable);
+            dfs(0, adjacencyList, reachable); // Start DFS from node 0
 
             // If not all nodes are reachable, the graph is not strongly connected.
             if (reachable.size() != numNodes) {
                 return false;
             }
 
-            // Step 4: Perform a reverse DFS from node 1 to check reverse reachability.
+            // Step 4: Perform a reverse DFS from node 0 to check reverse reachability.
             Set<Integer> reverseReachable = new HashSet<>();
-            dfs(1, reverseAdjacencyList, reverseReachable);
+            dfs(0, reverseAdjacencyList, reverseReachable);
 
             // If not all nodes are reachable in the reverse graph, the graph is not strongly connected.
             if (reverseReachable.size() != numNodes) {
                 return false;
             }
 
-            // Step 5: Use Z3 to verify strong connectivity constraints.
-            Solver solver = ctx.mkSolver();
-
-            // Step 6: Create Z3 variables to represent reachability between nodes.
-            // reachVars[i][j] represents whether there is a path from node i to node j.
-            BoolExpr[][] reachVars = new BoolExpr[numNodes + 1][numNodes + 1];
-            for (int i = 1; i <= numNodes; i++) {
-                for (int j = 1; j <= numNodes; j++) {
-                    if (i != j) {
-                        reachVars[i][j] = ctx.mkBoolConst("reach_" + i + "_" + j);
-                    }
-                }
-            }
-
-            // Step 7: Add Z3 constraints for direct edges.
-            for (int[] edge : edges) {
-                int u = edge[0]; // Start node of the edge.
-                int v = edge[1]; // End node of the edge.
-
-                // If there's a direct edge from u to v, they are directly reachable.
-                solver.add(reachVars[u][v]);
-            }
-
-            // Step 8: Add Z3 constraints for transitive closure.
-            for (int i = 1; i <= numNodes; i++) {
-                for (int j = 1; j <= numNodes; j++) {
-                    if (i != j) {
-                        // Start with no paths between nodes i and j.
-                        BoolExpr reachableThroughOthers = ctx.mkFalse();
-
-                        for (int k = 1; k <= numNodes; k++) {
-                            if (k != i && k != j) {
-                                // If there's a path from i to k and k to j, then i can reach j through k.
-                                reachableThroughOthers = ctx.mkOr(reachableThroughOthers,
-                                        ctx.mkAnd(reachVars[i][k], reachVars[k][j]));
-                            }
-                        }
-
-                        // Enforce that i can reach j either directly or indirectly.
-                        solver.add(ctx.mkImplies(reachVars[i][j], reachableThroughOthers));
-                    }
-                }
-            }
-
-            // Step 9: Add constraints for strong connectivity.
-            BoolExpr stronglyConnected = ctx.mkTrue();
-            for (int i = 1; i <= numNodes; i++) {
-                for (int j = i + 1; j <= numNodes; j++) {
-                    // Both i must reach j and j must reach i.
-                    stronglyConnected = ctx.mkAnd(stronglyConnected, reachVars[i][j], reachVars[j][i]);
-                }
-            }
-            solver.add(stronglyConnected);
-
-            // Step 10: Use the solver to check if all constraints are satisfiable.
-            return solver.check() == Status.SATISFIABLE;
+            // The graph is strongly connected.
+            return true;
 
         } finally {
-            // Step 11: Close the Z3 context to release resources.
-            ctx.close();
+            ctx.close(); // Close the Z3 context to release resources.
+        }
+    }
+
+
+    
+    private static List<List<Integer>> tarjansSCC(GraphInput graphInput) {
+        int numNodes = graphInput.numNodes;
+
+        // Create an adjacency list representation of the graph.
+        List<List<Integer>> graph = new ArrayList<>();
+        for (int i = 0; i < numNodes; i++) {
+            graph.add(new ArrayList<>());
+        }
+
+        // Populate the adjacency list with directed edges from the input.
+        for (int[] edge : graphInput.edges) {
+            graph.get(edge[0]).add(edge[1]); // Add a directed edge from edge[0] to edge[1].
+        }
+
+        // List to store all strongly connected components (SCCs).
+        List<List<Integer>> sccComponents = new ArrayList<>();
+
+        // Arrays to keep track of discovery IDs and low-link values for each node.
+        int[] ids = new int[numNodes]; // Discovery IDs for each node.
+        int[] low = new int[numNodes]; // Lowest discovery ID reachable from each node.
+
+        // Boolean array to track whether a node is currently in the recursion stack.
+        boolean[] onStack = new boolean[numNodes];
+
+        // Stack to store the nodes currently being processed in the DFS.
+        Stack<Integer> stack = new Stack<>();
+
+        // Mutable variable to assign unique discovery IDs to each node.
+        int[] id = {0}; // Starts from 0.
+
+        // Initialize all nodes as unvisited by setting their discovery IDs to -1.
+        Arrays.fill(ids, -1);
+
+        // Perform a depth-first search (DFS) on all unvisited nodes.
+        for (int i = 0; i < numNodes; i++) {
+            if (ids[i] == -1) { // If the node has not been visited.
+                dfsTarjan(i, ids, low, onStack, stack, graph, sccComponents, id);
+            }
+        }
+
+        // Return the list of strongly connected components.
+        return sccComponents;
+    }
+
+
+    private static void dfsTarjan(int at, int[] ids, int[] low, boolean[] onStack, Stack<Integer> stack,
+                                  List<List<Integer>> graph, List<List<Integer>> sccComponents, int[] id) {
+    	   // Assign the discovery ID and low-link value to the current node.
+        ids[at] = low[at] = id[0]++;
+        stack.push(at); // Push the current node onto the stack.
+        onStack[at] = true; // Mark the current node as being on the stack.
+
+        // Explore all neighbors of the current node.
+        for (int to : graph.get(at)) {
+            if (ids[to] == -1) {
+                // If the neighbor hasn't been visited, recursively perform DFS on it.
+                dfsTarjan(to, ids, low, onStack, stack, graph, sccComponents, id);
+
+                // Update the low-link value of the current node based on the neighbor's low-link value.
+                low[at] = Math.min(low[at], low[to]);
+            } else if (onStack[to]) {
+                // If the neighbor is already on the stack, update the low-link value based on its discovery ID.
+                low[at] = Math.min(low[at], ids[to]);
+            }
+        }
+
+        // If the current node is a root node (discovery ID equals low-link value),
+        // it means we have found a strongly connected component (SCC).
+        if (ids[at] == low[at]) {
+            List<Integer> component = new ArrayList<>();
+
+            // Pop all nodes from the stack that belong to this SCC.
+            while (!stack.isEmpty()) {
+                int node = stack.pop();
+                onStack[node] = false; // Mark the node as no longer being on the stack.
+                component.add(node); // Add the node to the SCC.
+
+                // Stop when we reach the root node of the SCC.
+                if (node == at) break;
+            }
+
+            // Add the completed SCC to the list of SCCs.
+            sccComponents.add(component);
         }
     }
 
