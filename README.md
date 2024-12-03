@@ -1,5 +1,8 @@
 # CMPT 477 Project: Graph Connectivity
-**By:** Sahba Hajihoseini, Layan Barrieshee, Liza Awwad  
+Sahba Hajihoseini  
+Layan Barrieshee  
+Liza Awwad  
+
 **Fall 2024**  
 
 ## Project Overview
